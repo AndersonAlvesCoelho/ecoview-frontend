@@ -1,5 +1,5 @@
 import { adaptDataset, adaptDatasets } from '@/service/adapters';
-import { fetchDatasetBySlug, fetchDatasets, fetchDatasetVersions } from '@/service/client';
+import { fetchDatasetBySlug, fetchDatasets, fetchDatasetVersions } from '@/service/datasets';
 import type { DatasetQueryParams } from '@/types/api';
 import { useQuery } from '@tanstack/react-query';
 

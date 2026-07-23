@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { GeometryIcon } from "@/components/catalog/GeometryIcon";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import type { Layer, LayerGroup } from "@/types/layer";
 import {
   DndContext,
   KeyboardSensor,
@@ -16,39 +20,75 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
+  BarChart,
+  Book,
+  Building,
   ChevronDown,
-  Info,
-  Map as MapIcon,
-  Trees,
-  Shield,
-  Flame,
+  Cloud,
   Droplet,
+  Flame,
   GripVertical,
+  Hammer,
+  Heart,
+  Info,
+  Layers,
+  Leaf,
+  Map as MapIcon,
+  Mountain,
   Search,
+  Shield,
+  Trees,
+  Truck,
+  Users,
+  Wheat,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import type { LayerGroup, Layer } from "@/types/layer";
-import { GeometryIcon } from "@/components/catalog/GeometryIcon";
-import { cn } from "@/lib/utils";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { DynamicIcon } from "../common/DynamicIcon";
 
+// Mapeamento completo de string → componente Lucide
 const ICONS: Record<string, LucideIcon> = {
   map: MapIcon,
   trees: Trees,
   shield: Shield,
   flame: Flame,
   droplet: Droplet,
+  users: Users,
+  building: Building,
+  "bar-chart": BarChart,
+  "alert-triangle": AlertTriangle,
+  cloud: Cloud,
+  leaf: Leaf,
+  heart: Heart,
+  book: Book,
+  truck: Truck,
+  zap: Zap,
+  wheat: Wheat,
+  layers: Layers,
+  hammer: Hammer,
+  mountain: Mountain,
 };
 
 interface LayerManagerProps {
   groups: LayerGroup[];
   onChange: (groups: LayerGroup[]) => void;
+  onGroupSelect?: (groupId: string) => void;
+  // Quando o painel abre focado num grupo específico
+  focusGroupId?: string | null;
+  onFocusHandled?: () => void;
 }
 
-export function LayerManager({ groups, onChange }: LayerManagerProps) {
+export function LayerManager({
+  groups,
+  onChange,
+  onGroupSelect,
+  focusGroupId,
+  onFocusHandled,
+}: LayerManagerProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -58,6 +98,14 @@ export function LayerManager({ groups, onChange }: LayerManagerProps) {
     Object.fromEntries(groups.map((g) => [g.id, true])),
   );
 
+  // Quando recebe um focusGroupId, garante que esse grupo está aberto
+  useEffect(() => {
+    if (focusGroupId) {
+      setOpenGroups((s) => ({ ...s, [focusGroupId]: true }));
+      onFocusHandled?.();
+    }
+  }, [focusGroupId, onFocusHandled]);
+
   const filtered = groups.map((g) => ({
     ...g,
     layers: g.layers.filter((l) =>
@@ -65,10 +113,7 @@ export function LayerManager({ groups, onChange }: LayerManagerProps) {
     ),
   }));
 
-  const totalActive = groups.reduce(
-    (a, g) => a + g.layers.filter((l) => l.visible).length,
-    0,
-  );
+  const totalActive = groups.reduce((a, g) => a + g.layers.filter((l) => l.visible).length, 0);
 
   const updateLayer = (groupId: string, layerId: string, patch: Partial<Layer>) => {
     onChange(
@@ -118,20 +163,46 @@ export function LayerManager({ groups, onChange }: LayerManagerProps) {
       </div>
 
       <div className="eco-scroll flex-1 overflow-y-auto">
+        {filtered.length === 0 && (
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+            Nenhuma camada disponível.
+          </p>
+        )}
         {filtered.map((group) => {
           const Icon = ICONS[group.icon] ?? MapIcon;
+          const iconColor = group.color ?? "var(--color-primary)";
           const open = openGroups[group.id];
           const originalGroup = groups.find((g) => g.id === group.id)!;
           const activeCount = originalGroup.layers.filter((l) => l.visible).length;
+
           return (
             <div key={group.id} className="border-b border-border/70 last:border-b-0">
               <button
-                onClick={() => setOpenGroups((s) => ({ ...s, [group.id]: !s[group.id] }))}
+                onClick={() => {
+                  const isNowOpen = !open;
+                  setOpenGroups((s) => ({ ...s, [group.id]: isNowOpen }));
+                  // Se o painel estava fechado, notifica o pai para abrir
+                  if (isNowOpen && onGroupSelect) {
+                    onGroupSelect(group.id);
+                  }
+                }}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
                 aria-expanded={open}
+                title={group.name}
               >
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/8 text-primary">
-                  <Icon className="h-4 w-4" strokeWidth={1.7} />
+                <span
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                  style={{
+                    backgroundColor: `${iconColor}18`,
+                    color: iconColor,
+                  }}
+                >
+                  <DynamicIcon
+                    name={group.icon}
+                    fallback="map"
+                    className="h-4 w-4"
+                    strokeWidth={1.7}
+                  />
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="block truncate text-sm font-medium text-foreground">
@@ -172,12 +243,8 @@ export function LayerManager({ groups, onChange }: LayerManagerProps) {
                         <SortableLayerItem
                           key={layer.id}
                           layer={layer}
-                          onToggle={(visible) =>
-                            updateLayer(group.id, layer.id, { visible })
-                          }
-                          onOpacity={(opacity) =>
-                            updateLayer(group.id, layer.id, { opacity })
-                          }
+                          onToggle={(visible) => updateLayer(group.id, layer.id, { visible })}
+                          onOpacity={(opacity) => updateLayer(group.id, layer.id, { opacity })}
                         />
                       ))}
                     </ul>
@@ -198,6 +265,48 @@ export function LayerManager({ groups, onChange }: LayerManagerProps) {
   );
 }
 
+// ── Collapsed sidebar icons ───────────────────────────────────
+// Renderizado pelo index.tsx quando leftOpen = false
+
+interface CollapsedLayerIconsProps {
+  groups: LayerGroup[];
+  onGroupClick: (groupId: string) => void;
+}
+
+export function CollapsedLayerIcons({ groups, onGroupClick }: CollapsedLayerIconsProps) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-3">
+      {groups.map((group) => {
+        const Icon = ICONS[group.icon] ?? MapIcon;
+        const iconColor = group.color ?? "var(--color-primary)";
+        const activeCount = group.layers.filter((l) => l.visible).length;
+
+        return (
+          <button
+            key={group.id}
+            onClick={() => onGroupClick(group.id)}
+            title={group.name}
+            className="relative grid h-9 w-9 place-items-center rounded-lg transition-colors hover:bg-muted"
+            style={{ color: iconColor }}
+            aria-label={`Abrir grupo ${group.name}`}
+          >
+            <Icon className="h-4 w-4" strokeWidth={1.7} />
+            {activeCount > 0 && (
+              <span
+                className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold text-white"
+                style={{ backgroundColor: iconColor }}
+              >
+                {activeCount}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── SortableLayerItem ─────────────────────────────────────────
 
 interface SortableLayerItemProps {
   layer: Layer;
@@ -206,8 +315,9 @@ interface SortableLayerItemProps {
 }
 
 function SortableLayerItem({ layer, onToggle, onOpacity }: SortableLayerItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: layer.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: layer.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -221,9 +331,7 @@ function SortableLayerItem({ layer, onToggle, onOpacity }: SortableLayerItemProp
       style={style}
       className={cn(
         "mx-2 mb-1.5 rounded-lg border px-2.5 py-2 transition-colors",
-        layer.visible
-          ? "border-primary/40 bg-primary/5"
-          : "border-transparent hover:bg-muted/50",
+        layer.visible ? "border-primary/40 bg-primary/5" : "border-transparent hover:bg-muted/50",
       )}
     >
       <div className="flex items-center gap-2">
@@ -242,9 +350,7 @@ function SortableLayerItem({ layer, onToggle, onOpacity }: SortableLayerItemProp
           <GeometryIcon type={layer.geometry} className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium text-foreground">
-            {layer.name}
-          </div>
+          <div className="truncate text-xs font-medium text-foreground">{layer.name}</div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
             {layer.source}
           </div>

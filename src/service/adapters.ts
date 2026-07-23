@@ -1,16 +1,7 @@
 // Converte resposta da API para o tipo Dataset usado nos componentes.
+import { GEOMETRY_MAP } from "@/lib/geo-utils";
 import type { ApiDataset, ApiVersion } from "@/types/api";
 import type { Dataset, DatasetVersion, GeometryType, SourceKey, ThemeKey } from "@/types/dataset";
-
-const GEOMETRY_MAP: Record<string, GeometryType> = {
-  POINT: "point",
-  MULTIPOINT: "point",
-  LINESTRING: "line",
-  MULTILINESTRING: "line",
-  POLYGON: "polygon",
-  MULTIPOLYGON: "polygon",
-  RASTER: "raster",
-};
 
 const THEME_MAP: Record<string, ThemeKey> = {
   meio_ambiente: "biomas",

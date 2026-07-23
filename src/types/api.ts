@@ -10,6 +10,7 @@ export interface ApiTheme {
   code:      string;
   name:      string;
   icon:      string | null;
+  color:      string | null;
   isPrimary: boolean;
 }
 
@@ -57,6 +58,7 @@ export interface ApiDataset {
   tags:           string[];
   featured:       boolean;
   thumbnailUrl:   string | null;
+  color:          string | null
   dataStartYear:  number | null;
   dataEndYear:    number | null;
   wms:            ApiWms | null;
@@ -91,12 +93,14 @@ export interface ApiThemeResponse {
   code:         string;
   name:         string;
   icon:         string | null;
+  color:         string | null;
   datasetCount: number;
   children: {
     id:           number;
     code:         string;
     name:         string;
     icon:         string | null;
+    color:         string | null;
     datasetCount: number;
   }[];
 }

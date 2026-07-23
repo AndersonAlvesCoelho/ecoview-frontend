@@ -1,16 +1,20 @@
 import { Header } from "@/components/layout/Header";
 import { FeatureInfoPanel } from "@/components/map/FeatureInfoPanel";
-import { LayerManager } from "@/components/map/LayerManager";
+import { CollapsedLayerIcons, LayerManager } from "@/components/map/LayerManager";
 import { MapContainer } from "@/components/map/MapContainer";
 import { MapControls } from "@/components/map/MapControls";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useDatasets } from "@/hooks/use-datasets";
+import { useThemes } from "@/hooks/use-themes";
 import { cn } from "@/lib/utils";
 import { sampleFeature } from "@/mock/features";
-import { initialLayerGroups } from "@/mock/layers";
+import { fetchDatasets } from "@/service/datasets";
+import { adaptThemesToLayerGroups } from "@/service/layer-adapters";
 import type { SelectedFeature } from "@/types/feature";
+import type { LayerGroup } from "@/types/layer";
 import { createFileRoute } from "@tanstack/react-router";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,13 +32,37 @@ export const Route = createFileRoute("/")({
 });
 
 function MapPage() {
-  const [groups, setGroups] = useState(initialLayerGroups);
+  const [groups, setGroups] = useState<LayerGroup[]>([]);
   const [feature, setFeature] = useState<SelectedFeature | null>(null);
   const [zoom, setZoom] = useState(5);
   const [baseMap, setBaseMap] = useState("streets");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [mobileLayersOpen, setMobileLayersOpen] = useState(false);
+  const [focusGroupId, setFocusGroupId] = useState<string | null>(null);
+
+  // Busca temas e datasets da API
+  const { data: themes } = useThemes();
+  const { data: datasetsResponse } = useDatasets({ limit: 100 });
+
+  // Monta os grupos quando os dados chegam
+  useEffect(() => {
+    if (!themes || !datasetsResponse?.data) return;
+
+    // Para o adaptador precisamos dos ApiDataset originais (não adaptados)
+    // então buscamos direto via fetchDatasets
+    fetchDatasets({ limit: 100 }).then((response) => {
+      const layerGroups = adaptThemesToLayerGroups(themes, response.data);
+      setGroups(layerGroups);
+    });
+  }, [themes, datasetsResponse]);
+
+  // Quando menu fechado e usuário clica num grupo:
+  // abre o menu e garante que o grupo clicado está expandido
+  function handleGroupSelect(groupId: string) {
+    setLeftOpen(true);
+    setFocusGroupId(groupId);
+  }
 
   const layers = groups.flatMap((g) => g.layers);
 
@@ -48,13 +76,14 @@ function MapPage() {
         {/* Left sidebar — Layer Manager (desktop) */}
         <aside
           className={cn(
-            "pointer-events-auto absolute left-4 top-4 z-30 hidden w-[320px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-panel)] transition-all lg:flex",
-            !leftOpen && "w-14",
+            "pointer-events-auto absolute left-4 top-4 z-30 hidden flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-panel)] transition-all duration-200 lg:flex",
+            leftOpen ? "w-[320px]" : "w-14",
           )}
           style={{ height: "calc(100% - 8rem)" }}
           aria-label="Gerenciador de camadas"
         >
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          {/* Header do painel */}
+          <div className="flex items-center justify-between border-b border-border px-3 py-2 shrink-0">
             {leftOpen && (
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Painel de Camadas
@@ -72,9 +101,20 @@ function MapPage() {
               )}
             </button>
           </div>
-          {leftOpen && (
+
+          {/* Conteúdo: expandido ou recolhido */}
+          {leftOpen ? (
             <div className="flex-1 overflow-hidden">
-              <LayerManager groups={groups} onChange={setGroups} />
+              <LayerManager
+                groups={groups}
+                onChange={setGroups}
+                focusGroupId={focusGroupId}
+                onFocusHandled={() => setFocusGroupId(null)}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <CollapsedLayerIcons groups={groups} onGroupClick={handleGroupSelect} />
             </div>
           )}
         </aside>

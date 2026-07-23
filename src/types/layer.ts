@@ -9,11 +9,13 @@ export interface Layer {
   opacity: number;
   color: string;
   datasetSlug?: string;
+  wmsUrl?: string
 }
 
 export interface LayerGroup {
   id: string;
   name: string;
   icon: string;
+  color?: string
   layers: Layer[];
 }
